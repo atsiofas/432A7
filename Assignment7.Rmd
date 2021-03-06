@@ -1,0 +1,116 @@
+---
+title: "Assignment7_DragonPhylogeny"
+author: "Alex Tsiofas"
+date: "06/03/2021"
+output: html_document
+---
+
+## Loading Libraries
+```{r}
+library(ape)
+library(ggtree)
+```
+
+## Loading the Appended Data
+```{r}
+dragon_dat <- read.nexus.data("/Users/alextsiofas/OneDrive - Queen's University/BIOL 432/Week7/432A7/input/DragonMatrix.nex")
+
+# this shows the last 6 dragons in the file including the three I added - 75TibetXXX, 76Aztec, and 77English
+tail(dragon_dat)
+```
+## Dragons appended
+The dragons I added were from very different parts of the world. The first was from Tibetan and Himalayan mythology called Druk, the Dragon of Thunder. It was said to live in the remote areas of Mount Everest and was responsible for both the storms and the sun.
+
+![](https://i.pinimg.com/originals/25/db/62/25db624379cfa3579a39c5dd3326aed2.jpg)
+Art by Fresco24 on Deviantart
+
+The next dragon I added was from Aztec mythology named Quetzalcoatl. His story spread across South America and he was worshipped for many reasons primarily for being the Aztec god of wind, air and learning.
+
+![](https://vignette2.wikia.nocookie.net/dxdfanon/images/2/2e/Quetzalcoatl_dragon.jpg/revision/latest?cb=20160716030052)
+
+Art by Primarch11 on dxdfanon.fandom.com
+
+The final dragon I added originated is a character from English writer Lewis Carrol's 'Through the Looking Glass and What Alice Found There'. This dragon is known as the Jabberwocky and was a part of a poem Alice found. It was said to have large wings, a fish-like head, and talon-like hands. It lived in a dark forest - I classified it as English even though it likely lived through the looking glass.
+
+![](https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/679109ea-22ab-41c1-82c0-674d354a1b1e/dapvz4f-a3340dd6-e9a6-4117-824a-4122a68c9109.png/v1/fill/w_1017,h_786,strp/jabberwock_by_prodigyduck_dapvz4f-pre.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3siaGVpZ2h0IjoiPD0xNTQ1IiwicGF0aCI6IlwvZlwvNjc5MTA5ZWEtMjJhYi00MWMxLTgyYzAtNjc0ZDM1NGExYjFlXC9kYXB2ejRmLWEzMzQwZGQ2LWU5YTYtNDExNy04MjRhLTQxMjJhNjhjOTEwOS5wbmciLCJ3aWR0aCI6Ijw9MjAwMCJ9XV0sImF1ZCI6WyJ1cm46c2VydmljZTppbWFnZS5vcGVyYXRpb25zIl19.YEee4v8NdYA2O3e9w69MEcl0yY77ZieXaJbZ28iYSTc)
+Art by ProdigyDuck on DeviantArt
+
+## Adding weights
+This file contains weights for each trait in the same order the traits were encoded. The weight value ranges from 1-9 then A-Z where A = 10, B=11, ... Z = 35. The higher the weight, the more highly conserved the trait would be (two dragons that differ in a highly conserved trait are less likely to be related)
+```{r}
+weight_dat <- read.csv("/Users/alextsiofas/OneDrive - Queen's University/BIOL 432/Week7/432A7/input/Weights.csv")
+```
+We need to multiple each weight value by its corresponding binary value.
+
+To do this we need a single vector of the weights
+```{r}
+#isolating the weight column
+weights <- paste0(weight_dat$Weight, collapse = "")
+#separating each weight value into a separate string in the vector
+weights <- strsplit(weights, split = "")[[1]]
+```
+
+Next the letter values need to be converted to their number values
+```{r}
+#initiating new vector to hold the weights all as numbers
+weight_nums <- rep(NA, length(weights))
+
+#for loop that finds all letters and converts it to the proper numeric value, if the value is not a letter the value will not change
+for (i in 1:length(weight_nums)){
+  if (weights[i] %in% LETTERS){
+    weight_nums[i] <- which(LETTERS == weights[i]) + 9
+  } else {
+    weight_nums[i] <- weight_nums[i]
+  }
+}
+#making sure all objects in this vector are recognized as a number object so that the multiplication can occur
+weight_nums <- as.numeric(weight_nums)
+```
+
+## Making a weighted data frame
+
+By multiplying our weight_nums vector by each line in the nexus file we can create a properly weighted dataframe that can be used to generate a distance matrix - but we still need to account for the missing values coded as '?'
+```{r}
+#initiating the new dataframe
+weight_dragons <- dragon_dat
+
+#for loop that goes through each binary value in the dragon_dat and assigns the position in the weights
+for (i in 1:length(dragon_dat)){
+  rep_weight <- dragon_dat[[i]]==1
+  weight_dragons[[i]][rep_weight] <- weight_nums[rep_weight]
+  rep_weight <- NA
+}
+```
+
+##Generating a distance matrix
+
+```{r}
+#creating a dataframe from the output of the for loop
+weight_df <- data.frame(matrix(unlist(weight_dragons), ncol = 78, byrow = T))
+#adding the same row names to our new df to keep track of the dragons
+row.names(weight_df) <- names(weight_dragons)
+#using dist function to generate the "evolutionary" distance values between all dragons
+weighted_dist <- dist(weight_df, method = 'euclidean')
+#changing to a matrix type object
+weighted_distmat <- as.matrix(weighted_dist)
+```
+
+## Creating the dragon phylogeny
+```{r}
+#creating a minimal evolution tree
+dragon_tree <- fastme.bal(weighted_dist)
+#neighbour joining tree
+ggtree(dragon_tree)
+```
+```{r}
+head(dragon_tree$tip.label)
+```
+```{r}
+Country<-gsub("[0-9\\.]+([^X]+)X*","\\1", dragon_tree$tip.label)
+CountryGroups <- split(dragon_tree$tip.label, Country)
+WtDTcol<-groupOTU(dragon_tree, CountryGroups)
+ggtree(WtDTcol, aes(colour=group)) + 
+  geom_tiplab(size=2)
+```
+
+
