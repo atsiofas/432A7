@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ## Loading Libraries
-```{r}
+```{r message = F, warning = F}
 library(ape)
 library(ggtree)
 ```
@@ -40,7 +40,7 @@ This file contains weights for each trait in the same order the traits were enco
 ```{r}
 weight_dat <- read.csv("/Users/alextsiofas/OneDrive - Queen's University/BIOL 432/Week7/432A7/input/Weights.csv")
 ```
-We need to multiple each weight value by its corresponding binary value.
+We need to multiply each weight value by its corresponding binary value.
 
 To do this we need a single vector of the weights
 ```{r}
@@ -60,7 +60,7 @@ for (i in 1:length(weight_nums)){
   if (weights[i] %in% LETTERS){
     weight_nums[i] <- which(LETTERS == weights[i]) + 9
   } else {
-    weight_nums[i] <- weight_nums[i]
+    weight_nums[i] <- weights[i]
   }
 }
 #making sure all objects in this vector are recognized as a number object so that the multiplication can occur
@@ -69,12 +69,12 @@ weight_nums <- as.numeric(weight_nums)
 
 ## Making a weighted data frame
 
-By multiplying our weight_nums vector by each line in the nexus file we can create a properly weighted dataframe that can be used to generate a distance matrix - but we still need to account for the missing values coded as '?'
+By multiplying our weight_nums vector by each line in the nexus file we can create a properly weighted dataframe that can be used to generate a distance matrix. In order to account for the 0's and ?'s we will simply replace the 1's with its corresponding weight value
 ```{r}
 #initiating the new dataframe
 weight_dragons <- dragon_dat
 
-#for loop that goes through each binary value in the dragon_dat and assigns the position in the weights
+#for loop that goes through each binary value in the dragon_dat and assigns the correct weight to any 1s in each dragon's code
 for (i in 1:length(dragon_dat)){
   rep_weight <- dragon_dat[[i]]==1
   weight_dragons[[i]][rep_weight] <- weight_nums[rep_weight]
@@ -82,9 +82,9 @@ for (i in 1:length(dragon_dat)){
 }
 ```
 
-##Generating a distance matrix
+## Generating a distance matrix
 
-```{r}
+```{r warning=F}
 #creating a dataframe from the output of the for loop
 weight_df <- data.frame(matrix(unlist(weight_dragons), ncol = 78, byrow = T))
 #adding the same row names to our new df to keep track of the dragons
@@ -96,21 +96,21 @@ weighted_distmat <- as.matrix(weighted_dist)
 ```
 
 ## Creating the dragon phylogeny
-```{r}
+We are using the minimal evolution tree to see the tree with the shortest overall branch lengths
+```{r fig.height=7}
 #creating a minimal evolution tree
-dragon_tree <- fastme.bal(weighted_dist)
-#neighbour joining tree
-ggtree(dragon_tree)
-```
-```{r}
-head(dragon_tree$tip.label)
-```
-```{r}
-Country<-gsub("[0-9\\.]+([^X]+)X*","\\1", dragon_tree$tip.label)
-CountryGroups <- split(dragon_tree$tip.label, Country)
-WtDTcol<-groupOTU(dragon_tree, CountryGroups)
-ggtree(WtDTcol, aes(colour=group)) + 
+dragon_tree_me <- fastme.bal(weighted_dist)
+
+#general tree with rectangular layout so labels can be most easily read
+tree_base <- ggtree(dragon_tree_me, layout="rectangular") +
   geom_tiplab(size=2)
+
+#Adding a new group with my new dragons so they can be a different colour from the rest
+groupOTU(tree_base, c(40, 41, 42)) + aes(colour = group) +
+  scale_colour_manual(values = c("black", "red"), labels = c("Dragons", "Newly Appended Dragons"), "Legend")
 ```
+
+
+This tree shows all dragons in the Nexus file and the three I added are in red. I added my dragons based on the key given in tutorial but a lot of traits of the other dragons didn't line up, I attempted to fix the data but was unsure if we could manipulate the other dragon's data. Overall this is why my the three dragons I added are branched together, because the rest of the dragons did not appear to follow the same code as what was provided to us.
 
 
